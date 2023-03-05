@@ -95,7 +95,7 @@
     docker run --rm -v ${pwd}:/src -w /src kjconroy/sqlc generate
     ```
 
-
+5. create transaction maintain file: store.go 
 
 
 

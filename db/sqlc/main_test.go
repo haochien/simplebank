@@ -15,15 +15,17 @@ const (
 )
 
 var testQueries *Queries
+var testDB *sql.DB
 
 func TestMain(m *testing.M) {
-	conn, err := sql.Open(DBDriver, DBSource) // in order to talk to specific db engine：go get github.com/lib/pq
+	var err error
+	testDB, err = sql.Open(DBDriver, DBSource) // in order to talk to specific db engine：go get github.com/lib/pq
 
 	if err != nil {
 		log.Fatal("cannot connect to db:", err)
 	}
 
-	testQueries = New(conn)
+	testQueries = New(testDB)
 
 	os.Exit(m.Run())
 }
