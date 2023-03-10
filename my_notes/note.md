@@ -14,6 +14,11 @@
     go get github.com/stretchr/testify
     ```
 
+4. Golang Gin (Web framework)
+    ```bash
+    go get -u github.com/gin-gonic/gin
+    ```
+
 
 # Set up and connect postgres from docker:
 0. pull docker image:
