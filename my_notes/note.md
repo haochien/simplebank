@@ -19,6 +19,12 @@
     go get -u github.com/gin-gonic/gin
     ```
 
+5. Golang Viper (env config )
+    ```bash
+    go get github.com/spf13/viper
+    ```
+
+
 
 # Set up and connect postgres from docker:
 0. pull docker image:
