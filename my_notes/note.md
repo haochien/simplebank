@@ -24,6 +24,11 @@
     go get github.com/spf13/viper
     ```
 
+5. Golang GoMock (mock DB)
+    ```bash
+    go install github.com/golang/mock/mockgen@v1.6.0
+    ```
+
 
 
 # Set up and connect postgres from docker:
@@ -109,4 +114,49 @@
 5. create transaction maintain file: store.go 
 
 
+# How to set up go Mock DB environment:
+0. download gomock:
+    ```bash
+    go install github.com/golang/mock/mockgen@v1.6.0
+    ```
+ 
 
+1. all function under store struct should be map to store interface.
+   we can manually add all those function to new store interface created in the next step.
+   But easier way would be add following parameter in sqlc.yaml:
+   ```yaml
+   emit_interface: true
+   ```
+   and regenerate sqlc
+    ```bash
+    docker run --rm -v ${pwd}:/src -w /src kjconroy/sqlc generate
+
+    # querier.go will then be created 
+    ```
+
+    
+
+2. create a store interface to differentiate the real store struct
+    ```go
+    // in store.go file: 
+
+    // Store defines all functions to execute db queries and transactions
+    type Store interface {
+        Querier
+        TransferTx(ctx context.Context, arg TransferTxParams) (TransferTxResult, error)
+    }
+
+    // SQLStore provides all functions to execute SQL queries and transactions
+    type SQLStore struct {
+        db *sql.DB
+        *Queries
+    }
+
+    ```
+
+3. create a mock folder under db folder, and run following command:
+    ```bash
+    mockgen -package mockdb -destination db/mock/store.go github.com/haochien/simplebank/db/sqlc Store
+
+    # store.go will then created under mock folder
+    ```
