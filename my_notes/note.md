@@ -82,6 +82,10 @@
     migrate -path db/migration -database "postgresql://root:secret@localhost:5432/simple_bank?sslmode=disable" -verbose down
     ```
 
+3. we can continue on create other migration scripts:
+    ```bash
+    migrate create -ext sql -dir db/migration -seq second_script
+    ```
 
 
 # How to set up go module and dependency:
