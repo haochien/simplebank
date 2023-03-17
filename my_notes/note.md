@@ -29,7 +29,16 @@
     go install github.com/golang/mock/mockgen@v1.6.0
     ```
 
+6. uuid for Golang:
+    ```bash
+    go get github.com/google/uuid
+    ```
 
+
+7. Golang JWT:
+    ```bash
+    go get github.com/dgrijalva/jwt-go
+    ```
 
 # Set up and connect postgres from docker:
 0. pull docker image:

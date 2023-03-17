@@ -1,1 +1,2 @@
-// unit tests for transfer.sql.go & entry.sql.go
+// unit tests for entry.sql.go
+// unit tests for api user.go (special topic about how to deal with hashed password in test)
