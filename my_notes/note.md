@@ -40,6 +40,11 @@
     go get github.com/dgrijalva/jwt-go
     ```
 
+8. Golang Paseto:
+    ```bash
+    go get github.com/o1egl/paseto
+    ```
+
 # Set up and connect postgres from docker:
 0. pull docker image:
     ```docker
