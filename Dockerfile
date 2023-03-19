@@ -15,8 +15,9 @@ WORKDIR /app
 # copy the executable binary file from the builder stage to the run stage image
 # /app/main: path to the file we want to copy; .: target location in the final image to copy that file to (i.e. /app)
 COPY --from=builder /app/main .
+COPY app.env .
 
 # note down the port which is intended to be published
 EXPOSE 8080
 # define the default command to run when the container starts (run the executable file)
-CMD [ "/app/mainn" ]
+CMD [ "/app/main" ]
