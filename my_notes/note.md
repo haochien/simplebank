@@ -178,3 +178,42 @@
 
     # store.go will then created under mock folder
     ```
+
+
+# How to build docker file:
+1. create dockerfile
+
+2. build the image
+    ```docker
+    docker build -t simplebank:latest .
+
+    # in case rerun and need to delete old image (c8f6cb16c708 is image id):
+    docker rmi c8f6cb16c708 
+    ```
+
+3. run created image
+    ```docker
+    # --name: specify the name of container we are going to create
+    docker run --name simplebank -p 8080:8080 simplebank:latest
+
+    # to run not in debug mode:
+    docker run --name simplebank -p 8080:8080 -e GIN_MODE=release simplebank:latest
+
+    # to deal with issue that default ip address of postgres and our simplebank is different:
+    docker run --name simplebank -p 8080:8080 -e GIN_MODE=release -e DB_SOURCE="postgresql://root:secret@172.17.0.2:5432/simple_bank?sslmode=disable" simplebank:latest
+    # note: you can use following command to check the ip address
+    docker container inspect simplebank
+    docker container inspect postgres15  
+
+    # better solution to deal with different ip in two container: create your own network, instead of default bridge network
+    docker network create bank-network
+    docker network connect bank-network postgres15
+    docker network inspect bank-network
+    docker run --name simplebank --network bank-network -p 8080:8080 -e GIN_MODE=release -e DB_SOURCE="postgresql://root:secret@postgres15:5432/simple_bank?sslmode=disable" simplebank:latest
+
+
+    # in case error occurs and need to rebuild:
+    docker rm simplebank
+    docker rmi c8f6cb16c708 
+    docker build -t simplebank:latest .
+    ```
