@@ -217,3 +217,31 @@
     docker rmi c8f6cb16c708 
     docker build -t simplebank:latest .
     ```
+
+4. create start.sh to able to run migration up command:
+
+    remember to update migrate commands in dockerfile to enable migrate binary download and usage.
+
+    also need update dockerfile to copy start.sh into image
+    
+    add ENTRYPOINT [ "/app/start.sh" ] in dockerfile to make start.sh as start point of the command
+
+5. create docker-compose.yaml file to auto run step 3 commands:
+    ```docker
+    # to run docker compose file:
+    # after run this, it will start from build image, and then connect to db container and access to api container in parallel
+    docker compose up 
+
+    # if need to revert, then run:
+    docker compose down
+    docker rmi simplebank-api
+    ```
+
+    Note that error might occur since db container and api container are build in parallel.
+
+    The api should wait until db is set up (because api relies on db connection)
+
+    Thus, depends_on should be setup in docker-compose.yaml.
+    
+    But depends_on does not wait for db and redis to be “ready” before starting web, healthcheck should be added to provide wait feature
+
