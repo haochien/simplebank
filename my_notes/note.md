@@ -327,3 +327,25 @@
           run: aws secretsmanager get-secret-value --secret-id simple_bank --query SecretString --output text | jq -r 'to_entries|map("\(.key)=\(.value)")|.[]' > app.env
 
         ```
+
+    e. check the new image in AWS ECR:
+
+       after merge above change without error, new image will be created in ECR. download and run that image:
+
+       ```bash
+        # image uri from ecr: 309977797415.dkr.ecr.eu-central-1.amazonaws.com/simplebank:b3ca1521d2187791968ecf667426f0ce9dbeec86
+
+        # login first
+        aws ecr get-login-password | docker login --username AWS --password-stdin 309977797415.dkr.ecr.eu-central-1.amazonaws.com  
+
+        # pull image
+        docker pull 309977797415.dkr.ecr.eu-central-1.amazonaws.com/simplebank:b3ca1521d2187791968ecf667426f0ce9dbeec86
+
+        # run image
+        docker run 309977797415.dkr.ecr.eu-central-1.amazonaws.com/simplebank:b3ca1521d2187791968ecf667426f0ce9dbeec86
+       ```
+
+
+
+
+
