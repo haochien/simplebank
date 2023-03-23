@@ -245,3 +245,85 @@
     
     But depends_on does not wait for db and redis to be “ready” before starting web, healthcheck should be added to provide wait feature
 
+
+
+
+# How to deploy to AWS:
+1. auto build and push image to AWS ECR with github action:
+    
+    a. create 1 Repositories in Amazon ECR
+
+    b. create 1 user in IAM (in this project example, remember to create Access key after user is created)
+
+    c. create yaml for deploy action (in config, deploy.yml only runs when push to master; test.yml runs when raise PR or merge to master). check iin github market place for instruction: https://github.com/marketplace/actions/amazon-ecr-login-action-for-github-actions
+
+    d. in github -> setting (under security -> secrets and variables -> Actions), configure deploy.yml  secret variables in Repository secrets
+
+
+2. setup aws rds:
+
+    a. create database in aws rds (get host(Endpoint), user, password, database, port)
+
+    b. try to connect via TablePlus
+
+    c. update migrate command in makefile. Migrate all db change to the database in aws
+
+
+3. setup AWS Secrets Manager to mange secret keys and env variables:
+
+    a. generate stronger secret keys (for example, to get 32-character TOKEN_SYMMETRIC_KEY, can run following command)
+
+        ```bash
+        openssl rand -hex 64 | head -c 32
+        ```
+    
+    b. create AWS Secrets Manager
+
+    c. move all variables feom .env to AWS Secrets Manager
+
+    d. create step in deploy ci to auto override the local env variables in app.env with prod variables from aws secret manager:
+
+        ```bash
+        # download aws cli in you pc
+
+        # run check install  
+        aws --version
+
+        # go to aws IAM to generate one access key for the user for this local cli use. 
+
+        # set up credentials to access aws account
+        aws configure
+        
+        AWS Access Key ID [None]: ${{ access_key_id_from_IAM }}
+        AWS Secret Access Key [None]: ${{ access_key_password_from_IAM }}
+        Default region name [None]: eu-central-1
+        Default output format [None]: json
+        # your access key id and password will be store under ~/.aws/credentials
+        # your region name and output format will be store under ~/.aws/config
+
+        # call secret manager api to retrieve secret values
+        aws secretsmanager help
+        aws secretsmanager get-secret-value help
+        # copy secret arn and secret name from aws secret manager
+        # you have to give the user-group of the user in IAM a permission of SecretsManagerReadWrite
+        aws secretsmanager get-secret-value --secret-id simple_bank
+        # can also use arn: aws secretsmanager get-secret-value --secret-id ${{ arn }} 
+        aws secretsmanager get-secret-value --secret-id simple_bank --query SecretString --output text
+
+        # convert json secret value to the format we want and replace local value in app.env with this new variables:
+        # use jq package (default package in linux) auto convert json to .env required format:
+        aws secretsmanager get-secret-value --secret-id simple_bank --query SecretString --output text | jq -r 'to_entries|map("\(.key)=\(.value)")|.[]' > app.env
+        # result will be:
+        # --------
+        DB_SOURCE=${{ value from secretsmanager }}
+        DB_DRIVER=${{ value from secretsmanager }}
+        SERVER_ADDRESS=${{ value from secretsmanager }}
+        TOKEN_SYMMETRIC_KEY=${{ value from secretsmanager }}
+        ACCESS_TOKEN_DURATION=${{ value from secretsmanager }}
+        # --------
+
+        # add the jq command into ci (i.e. deploy.yml)
+        - name: Load secrets and save to app.env
+          run: aws secretsmanager get-secret-value --secret-id simple_bank --query SecretString --output text | jq -r 'to_entries|map("\(.key)=\(.value)")|.[]' > app.env
+
+        ```
