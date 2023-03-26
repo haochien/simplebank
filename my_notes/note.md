@@ -339,13 +339,305 @@
         aws ecr get-login-password | docker login --username AWS --password-stdin 309977797415.dkr.ecr.eu-central-1.amazonaws.com  
 
         # pull image
-        docker pull 309977797415.dkr.ecr.eu-central-1.amazonaws.com/simplebank:b3ca1521d2187791968ecf667426f0ce9dbeec86
+        docker pull 309977797415.dkr.ecr.eu-central-1.amazonaws.com/simplebank:2a8f83c1991bd3e02f0ca40890732ab2dc3463b1
 
         # run image
-        docker run 309977797415.dkr.ecr.eu-central-1.amazonaws.com/simplebank:b3ca1521d2187791968ecf667426f0ce9dbeec86
+        docker run -p 8080:8080 309977797415.dkr.ecr.eu-central-1.amazonaws.com/simplebank:2a8f83c1991bd3e02f0ca40890732ab2dc3463b1
        ```
 
+4. Kubernetes setup (via AWS EKS):
+
+    a. config cluster in EKS (need to create an EKS-Cluster Role in IAM)
+
+    b. config Node Group (need to create an EC2 Role in IAM - with permission AmazonEKS_CNI_Policy & AmazonEKSWorkerNodePolicy & AmazonEC2ContainerRegistryReadOnly)
+
+    c. install Kubectl:
+    ```bash
+    ## connect to AWS EKS cluster
+
+    # provide eks permission to User github-ci by creating inline policy of EKS to deployment User Group
+    aws eks update-kubeconfig --name simple-bank --region eu-central-1
+
+    # config file will be created under kube folder
+    ls -l ~/.kube
+    cat ~/.kube/config
+
+    # after checking the context of cluster, connect to this context
+    kubectl config use-context arn:aws:eks:eu-central-1:309977797415:cluster/simple-bank
+
+    # check whether can connect to simple-bank cluster
+    kubectl cluster-info
+
+    # if get auth error (check https://repost.aws/knowledge-center/amazon-eks-cluster-access):
+    # solution: grant access to the cluster to a user who is not the creator of the cluster
+
+    # - check the current user identity (you will find that it is github-ci user, not the root user we used to create the cluster. also access key used is github-ci suer)
+    aws sts get-caller-identity
+    cat ~/.aws/credentials
+
+    # to My security credentials in AWS, create access key in access keys section. and update aws credentials file:
+    vi ~/.aws/credentials
+    ####
+    [default]
+    aws_access_key_id = ${{ new }}
+    aws_secret_access_key = ${{ new }}
+
+    [github]
+    aws_access_key_id = ${{ old }}
+    aws_secret_access_key = ${{ old }}
+    ####
+    :wq
+    
+    # check whether still have any auth error:
+    kubectl get pods
+    kubectl cluster-info
+
+    # now can access the cluster using the credentials of the root user
+
+    # ------ note: tell aws cli to use github credentials
+    export AWS_PROFILE=github
+    # if windows: $Env:AWS_PROFILE="github"
+    # to switch back: export AWS_PROFILE=default
+
+    # But how to allow github user to access the cluster:
+    # need to add this user to a special config map
+    # 0. you must be in default root profile first: 
+    export AWS_PROFILE=default
+    # 1. create a folder "eks" in the simple bank project root. And add file "aws-auth.yaml" 
+    # 2. apply auth map yaml:
+     kubectl apply -f eks/aws-auth.yaml
+    # 3. use github credentials
+    export AWS_PROFILE=github
+    # 4. check:
+    kubectl cluster-info
 
 
+    # install k9s to use kubernetes command easily (compared to kubedctl)
+    scoop install k9s
+    k9s
+
+    # show all namespaces of the cluster:
+    : ns --> enter --> select one namespace to enter and press esc to exit
+
+    # list all service:
+    : service --> enter
+
+    list all pods:
+    : pods --> enter
+
+    list all cronjobs:
+    : cj --> enter
+
+    list all nodes:
+    : nodes --> enter
+
+    check config map:
+    : configmap --> enter
+
+    to exit k9s:
+    : quit --> enter
+    ```
+
+5. deploy web app to Kubernetes cluster on AWS EKS (https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+
+    a. create deployment.yaml file under folder /eks
 
 
+    b. run it and check in k9s:
+    ```bash
+     kubectl apply -f eks/deployment.yaml
+
+     k9s
+     :deployment
+
+     # chose first one and click enter to enter pods view. will see pod is not ready. -> press "d" will see failscheduling error in pod
+    ```
+
+    c. go to AWS EKS --> Clusters --> simple-bank: will see no nodes in Compute tag: 
+
+        go to Auto Scaling group and change desired capacity from 0 to 1
+    
+
+    d. back to pods in k9s, press "d" will see different 2 errors about too many pods:
+    
+        # go to :nodes --> press "d" --> will see all 4 pods are occupied in Mom-Terminated Pods section (nb of pods depends on VNI you chose when set up the cluster:https://github.com/awslabs/amazon-eks-ami/blob/master/files/eni-max-pods.txt)
+
+        # go to AWS EKS --> clusters --> simple-bank --> Node Group --> will see Instance types is t3.micro
+
+        # Need to delete this one and recreate one with larger instance type (same as step 4)
+
+        # back to k9s --> :deployments --> delete current deployment by ctrl+d
+
+        # rerun:
+        kubectl apply -f eks/deployment.yaml
+
+    e. in k9s --> :deployments --> enter (to pods) --> enter (to containers) --> press l and can see log that the server is now listening and serving HTTP requests on port 8080
+
+    f. To enable to send the request to this pod (https://kubernetes.io/docs/concepts/services-networking/service/)
+
+        # create service.yaml under /eks folder: 
+        specify type: LoadBalancer; otherwise the default will be ClusterIP and you will have no external IP
+
+        # run:
+        kubectl apply -f eks/service.yaml
+
+        # check in k9s
+        :services
+
+        # check the external IP (this is actually the domain name of the AWS load balancer service):
+        nslookup a9a9507a541a74b40bee0b6162d5ef1c-1729569289.eu-central-1.elb.amazonaws.com
+
+        # using this domain and test api in postman, for exmaple: http://a9a9507a541a74b40bee0b6162d5ef1c-1729569289.eu-central-1.elb.amazonaws.com/users/login
+
+
+6. Register a domain and set up A-record using AWS Route 53 Dashboard
+
+    a. register a domain from Route 53
+
+    b. route traffics to the Kubernetes cluster:
+        click Hosted Zones in Route 53 --> create new record (Address (A) record) --> have domain name like: api.maindomain.com
+
+    c. test routing on this A-record in postman (e.g. http://api.maindomain.com/users/login) 
+
+
+7. use Ingress to route traffics to different services in Kubernetes:
+
+    Ingress allows us to set up A record only once, but can define multiple rules in the config file to route traffic to different services
+
+    ## a. reset API service to ClusterIP
+    change type of the simple-bank API service from LoadBalancer to ClusterIP because we do not want to expose this service to the outside world anymore
+
+    ## b. set up ingress.yaml
+    create ingress.yaml in /eks folder
+
+    ## c.  run following commands:
+    ```bash
+    kubectl apply -f eks/service.yaml
+    kubectl apply -f eks/ingress.yaml
+    
+    #check in k9s --> :ingresses --> no address yet for the ingress
+    ```
+
+    ## d. install NGINX Ingress:
+    In order for the Ingress resource to work, the cluster must have an ingress controller running.
+    
+    Unlike other types of controllers which run as part of the kube-controller-manager binary, Ingress controllers are not started automatically with a cluster. 
+    (https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/)
+
+    (https://kubernetes.github.io/ingress-nginx/deploy/#aws)
+
+    ```bash
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.6.4/deploy/static/provider/aws/deploy.yaml
+    ```
+
+    check in k9s --> :pods --> see whether ingress-nginx-controller pod running in the ingress-nginx namespace
+    
+    check :ingresses --> can see external address to be accessed by the outside world (e.g. ace106ad58eda4d49a07258482038587-a661b702b2f9c978.elb.eu-central-1.amazonaws.com.)
+
+    copy the address to Route 53 hosted zone --> edit original api.maindomain.com A-record
+
+    run following code to check ip addresses of the domain:
+    ```bash
+    nslookup api.maindomain.com
+    nslookup ace106ad58eda4d49a07258482038587-a661b702b2f9c978.elb.eu-central-1.amazonaws.com.
+    # both should get same ip addresses
+    ```
+
+    in final, test with postman to see whether the the ingress works
+
+
+8. auto issue TLS certificates with cert-manager and Let's Encrypt
+
+    ## a. download cert-manager:
+    (https://cert-manager.io/docs/installation/kubectl/)
+
+    run following code:
+    ```bash
+    kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.11.0/cert-manager.yaml
+
+    # then check in k9s --> :ns --> you should see few pods running for cert-manager namespace
+    ```
+
+    ## b. Creating a Basic ACME Issuer:
+    (https://cert-manager.io/docs/configuration/acme/)
+
+    create issuer.yaml under /eks folder
+
+    run following command to execute:
+    ```bash
+    kubectl apply -f eks/issuer.yaml
+
+    # then check in k9s --> :clusterissuers
+    # then check in k9s --> :secrets  --> can find its private key
+    # then check in k9s --> :certificate  --> still empty
+    ```
+
+    ## c. Attached the issuer to ingress
+    add following codes to ingress.yaml:
+    ```yaml
+    annotations:
+        cert-manager.io/cluster-issuer: letsencrypt
+    
+
+    tls:
+    - hosts:
+        - api.maindomain.com
+        secretName: simple-bank-api-cert
+    ```
+
+    then run:
+    ```bash
+    kubectl apply -f eks/ingress.yaml
+
+    # then check in k9s --> :ns  --> all
+    # then check in k9s --> :ingress  --> press "d" --> will see TLS is enabled
+    # then check in k9s --> :certificate 
+    ```
+
+    test on postman, both should work:
+    https://api.maindomain.com/users/login
+    http://api.maindomain.com/users/login
+
+
+9. Auto deploy to kubernetes with github action:
+
+    ## a. update deploy.yml
+    (https://github.com/marketplace/actions/kubectl-tool-installer)
+    (https://storage.googleapis.com/kubernetes-release/release/stable.txt)
+
+    - add new step: name: Install kubectl
+    - update steo: name: Build, tag, and push docker image to Amazon ECR
+        ```bash
+        # old
+        run: |
+            docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+            docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+        
+        # new
+        run: |
+            docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -t latest .
+            docker push -a $REGISTRY/$REPOSITORY:$IMAGE_TAG 
+        ```
+    
+    - add new step: name: Deploy image to Amazon EKS
+
+    ## b. update deployment.yaml
+    ```bash
+    # old
+    spec:
+      containers:
+      - name: simple-bank-api
+        image: 309977797415.dkr.ecr.eu-central-1.amazonaws.com/simplebank:2a8f83c1991bd3e02f0ca40890732ab2dc3463b1
+        ports:
+        - containerPort: 8080
+    
+    # new
+    spec:
+      containers:
+      - name: simple-bank-api
+        # using latest instead of image tag
+        image: 309977797415.dkr.ecr.eu-central-1.amazonaws.com/simplebank:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+    ```
