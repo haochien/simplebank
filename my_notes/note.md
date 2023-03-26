@@ -606,7 +606,10 @@
     (https://storage.googleapis.com/kubernetes-release/release/stable.txt)
 
     - add new step: name: Install kubectl
-    - update steo: name: Build, tag, and push docker image to Amazon ECR
+
+    - add new step: name: Update kube config
+
+    - update step: name: Build, tag, and push docker image to Amazon ECR
         ```bash
         # old
         run: |
@@ -615,8 +618,8 @@
         
         # new
         run: |
-            docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -t latest .
-            docker push -a $REGISTRY/$REPOSITORY:$IMAGE_TAG 
+            docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG:latest .
+            docker push -a $ECR_REGISTRY/$ECR_REPOSITORY
         ```
     
     - add new step: name: Deploy image to Amazon EKS
