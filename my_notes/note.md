@@ -618,8 +618,8 @@
         
         # new
         run: |
-            docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-            docker push -a $ECR_REGISTRY/$ECR_REPOSITORY
+            docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -t $REGISTRY/$REPOSITORY:latest .
+            docker push -a $REGISTRY/$REPOSITORY
         ```
     
     - add new step: name: Deploy image to Amazon EKS
