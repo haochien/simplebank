@@ -637,6 +637,7 @@
       - name: simple-bank-api
         # using latest instead of image tag
         image: 309977797415.dkr.ecr.eu-central-1.amazonaws.com/simplebank:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
     ```
